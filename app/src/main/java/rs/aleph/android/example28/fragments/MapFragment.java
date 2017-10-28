@@ -1,20 +1,23 @@
 package rs.aleph.android.example28.fragments;
 
-import android.app.Dialog;
+import android.Manifest;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -34,6 +37,7 @@ import rs.aleph.android.example28.dialogs.LocationDialog;
 /**
  * Created by milossimic on 4/13/16.
  */
+
 /**
  * Fragment koji treab da prikaze mapu treba da implementira i OnMapReadyCallback
  * interface posto su nove verzije mape asinhrone, tj ucitavanje mape se oddvija asinhrono.
@@ -42,6 +46,8 @@ import rs.aleph.android.example28.dialogs.LocationDialog;
  * i informacije i lokaciji
  * */
 public class MapFragment extends Fragment implements LocationListener, OnMapReadyCallback {
+
+    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
     private LocationManager locationManager;
     private String provider;
@@ -94,11 +100,11 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
     }
 
 
-    private void showLocatonDialog(){
-        if(dialog == null){
+    private void showLocatonDialog() {
+        if (dialog == null) {
             dialog = new LocationDialog(getActivity()).prepareDialog();
-        }else{
-            if(dialog.isShowing()){
+        } else {
+            if (dialog.isShowing()) {
                 dialog.dismiss();
             }
         }
@@ -115,10 +121,24 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
         boolean gps = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
         boolean wifi = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
-        if (!gps || !wifi){
+        if (!gps && !wifi) {
             showLocatonDialog();
         } else {
-            locationManager.requestLocationUpdates(provider, 0, 0, this);
+            if (checkLocationPermission()) {
+                if (ContextCompat.checkSelfPermission(getContext(),
+                        Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                    //Request location updates:
+                    locationManager.requestLocationUpdates(provider, 0, 0, this);
+                    Toast.makeText(getContext(), "ACCESS_FINE_LOCATION", Toast.LENGTH_SHORT).show();
+                }else if(ContextCompat.checkSelfPermission(getContext(),
+                        Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+
+                    //Request location updates:
+                    locationManager.requestLocationUpdates(provider, 0, 0, this);
+                    Toast.makeText(getContext(), "ACCESS_COARSE_LOCATION", Toast.LENGTH_SHORT).show();
+                }
+            }
         }
 
     }
@@ -137,7 +157,7 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
      * */
     @Override
     public void onLocationChanged(Location location) {
-        Toast.makeText(getActivity(), "Toast", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getActivity(), "NEW LOCATION", Toast.LENGTH_SHORT).show();
         if (map != null) {
             addMarker(location);
         }
@@ -158,52 +178,127 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
 
     }
 
+    public boolean checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(getActivity(),
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+                new AlertDialog.Builder(getActivity())
+                        .setTitle("Allow user location")
+                        .setMessage("To continue working we need your locations....Allow now?")
+                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                //Prompt the user once explanation has been shown
+                                ActivityCompat.requestPermissions(getActivity(),
+                                        new String[]{
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION},
+                                        MY_PERMISSIONS_REQUEST_LOCATION);
+                            }
+                        })
+                        .create()
+                        .show();
+
+
+            } else {
+                // No explanation needed, we can request the permission.
+                ActivityCompat.requestPermissions(getActivity(),
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION},
+                        MY_PERMISSIONS_REQUEST_LOCATION);
+            }
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(getActivity(),
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+
+                        //Request location updates:
+                        locationManager.requestLocationUpdates(provider, 0, 0, this);
+                    }
+
+                } else if (grantResults.length > 0
+                        && grantResults[1] == PackageManager.PERMISSION_GRANTED){
+
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    if (ContextCompat.checkSelfPermission(getActivity(),
+                            Manifest.permission.ACCESS_COARSE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+
+                        //Request location updates:
+                        locationManager.requestLocationUpdates(provider, 0, 0, this);
+                    }
+
+                }
+                return;
+            }
+
+        }
+    }
+
+
     /**
      * KAda je mapa spremna mozemo da radimo sa njom.
      * Mozemo reagovati na razne dogadjaje dodavanje markera, pomeranje markera,klik na mapu,...
      * */
     @Override
     public void onMapReady(GoogleMap googleMap) {
-        Location location = locationManager.getLastKnownLocation(provider);
-
         map = googleMap;
+        Location location = null;
+
+        if (checkLocationPermission()) {
+            if (ContextCompat.checkSelfPermission(getContext(),
+                    Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                //Request location updates:
+                location = locationManager.getLastKnownLocation(provider);
+            }else if(ContextCompat.checkSelfPermission(getContext(),
+                    Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED){
+
+                //Request location updates:
+                location = locationManager.getLastKnownLocation(provider);
+            }
+        }
 
         //ako zelimo da rucno postavljamo markere to radimo
         //dodavajuci click listener
         map.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
-            public void onMapClick(final LatLng latLng) {
-                final Dialog dialog = new Dialog(getActivity());
-                dialog.setContentView(R.layout.comment_input);
+            public void onMapClick(LatLng latLng) {
+                map.addMarker(new MarkerOptions()
+                        .title("YOUR_POSITON")
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+                        .position(latLng));
+                home.setFlat(true);
 
-                final EditText edit = (EditText) dialog.findViewById(R.id.comment_input);
-                Button comment = (Button) dialog.findViewById(R.id.comment);
-                comment.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        Marker marker = map.addMarker(new MarkerOptions()
-                                .title("YOUR_POSITON")
-                                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
-                                .position(latLng));
+                CameraPosition cameraPosition = new CameraPosition.Builder()
+                        .target(latLng).zoom(14).build();
 
-                        home.setFlat(true);
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(latLng).zoom(14).build();
-                        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-
-                        marker.setTag(edit.getText().toString());
-
-                        dialog.dismiss();
-                    }
-                });
-                Button cancel = (Button) dialog.findViewById(R.id.cancel);
-                cancel.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        dialog.dismiss();
-                    }
-                });
-
-                dialog.show();
+                map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
             }
         });
 
@@ -211,10 +306,7 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
         map.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
-
-                String test = (String) marker.getTag();
-
-                Toast.makeText(getActivity(), marker.getTitle()+":"+test, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), marker.getTitle(), Toast.LENGTH_SHORT).show();
                 return true;
             }
         });
@@ -258,8 +350,6 @@ public class MapFragment extends Fragment implements LocationListener, OnMapRead
 
         CameraPosition cameraPosition = new CameraPosition.Builder()
                 .target(loc).zoom(14).build();
-
-        home.setTag("");
 
         map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
     }
